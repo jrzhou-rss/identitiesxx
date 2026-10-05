@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>恆等式雷射防衛戰</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <!-- MathJax Configuration and Script -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']]
+      },
+      svg: { fontCache: 'global' },
+      startup: { typeset: true }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Noto+Sans+TC:wght@600;800;900&display=swap');
+
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      background-color: #030712;
+      color: #f9fafb;
+      overflow-x: hidden;
+    }
+
+    .font-orbitron {
+      font-family: 'Orbitron', 'Noto Sans TC', sans-serif;
+    }
+
+    /* MathJax font sizing */
+    .mjx-chtml, .MathJax {
+      font-size: 130% !important;
+      color: #ffffff !important;
+    }
+
+    /* Glow utilities */
+    .glow-cyan {
+      box-shadow: 0 0 25px rgba(6, 182, 212, 0.7);
+    }
+    .glow-rose {
+      box-shadow: 0 0 25px rgba(244, 63, 94, 0.7);
+    }
+
+    /* Pulse animation for danger state */
+    @keyframes pulse-fast {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+    .animate-pulse-fast {
+      animation: pulse-fast 0.6s infinite;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between p-3 sm:p-5 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-950 via-indigo-950 to-gray-950">
+
+  <!-- 頂部資訊列 -->
+  <header class="max-w-7xl mx-auto w-full bg-slate-900/90 border border-cyan-500/30 rounded-2xl p-3 sm:p-4 shadow-xl mb-3 backdrop-blur-md">
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-12 h-12 bg-gradient-to-tr from-cyan-500 via-purple-500 to-rose-500 rounded-xl flex items-center justify-center text-2xl shadow-lg glow-cyan">
+          🚀
+        </div>
+        <div>
+          <h1 class="text-xl sm:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-purple-300 to-rose-400 font-orbitron">
+            恆等式雷射防衛戰
+          </h1>
+          <p class="text-xs text-slate-400 flex items-center gap-2">
+            <span>👑 指揮官：<strong id="display-player-name" class="text-cyan-300 font-bold">太空戰士</strong></span>
+            <span>|</span>
+            <span>任務進度：<strong id="progress-text" class="text-purple-300 font-bold">1 / 10</strong></span>
+          </p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-4 sm:gap-6 font-mono">
+        <!-- 生命值條 (HP) -->
+        <div class="bg-slate-950 px-3 py-2 rounded-xl border border-slate-800 flex flex-col items-center">
+          <span class="text-[10px] text-slate-400 font-bold mb-1">BASE DEFENSE HP</span>
+          <div class="w-32 sm:w-44 bg-slate-900 rounded-full h-4 border border-slate-700 overflow-hidden relative shadow-inner">
+            <div id="hp-bar-fill" class="bg-gradient-to-r from-rose-500 via-amber-400 to-emerald-400 h-full w-full transition-all duration-300"></div>
+            <span id="hp-text" class="absolute inset-0 flex items-center justify-center text-[10px] font-black text-white drop-shadow">100 / 100</span>
+          </div>
+        </div>
+
+        <!-- 分數顯示 -->
+        <div class="bg-slate-950 px-4 py-2 rounded-xl border border-slate-800 text-center">
+          <span class="text-[10px] text-slate-400 font-bold block">SCORE</span>
+          <span id="score-display" class="text-cyan-400 font-black text-xl sm:text-2xl">0000</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主戰場：雙欄設計 -->
+  <main class="max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-5 flex-grow items-start">
+
+    <!-- 左側：太空畫布戰場 (7 欄) -->
+    <div class="lg:col-span-7 bg-slate-950/90 border-2 border-cyan-500/30 rounded-3xl p-3 shadow-2xl flex flex-col items-center justify-between min-h-[460px] relative overflow-hidden">
+      
+      <!-- Canvas 遊戲畫面 -->
+      <canvas id="gameCanvas" class="w-full h-[420px] rounded-2xl bg-black block shadow-inner"></canvas>
+
+      <div class="w-full mt-2 flex justify-between items-center text-xs text-slate-400 px-2 font-mono">
+        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-cyan-400 inline-block animate-ping"></span> 左砲：x/x² 係數</span>
+        <span id="enemy-alert-tag" class="text-amber-400 font-bold hidden animate-pulse-fast">⚠️ 敵艦射出電漿光束！</span>
+        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block animate-ping"></span> 右砲：常數/x 係數</span>
+      </div>
+
+    </div>
+
+    <!-- 右側：雙管雷射控制終端機 (5 欄) -->
+    <div class="lg:col-span-5 flex flex-col gap-4">
+
+      <!-- 控制卡片 -->
+      <div class="bg-slate-900/90 border-2 border-slate-800 rounded-3xl p-5 shadow-2xl relative backdrop-blur-md">
+        
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-sm font-bold text-cyan-400 flex items-center gap-1.5">
+            🎯 鎖定目標恆等式
+          </span>
+          <span id="problem-source" class="bg-purple-950/80 text-purple-300 border border-purple-800 text-xs px-3 py-1 rounded-full font-bold">
+            教材習題 3A
+          </span>
+        </div>
+
+        <!-- 恆等式特大顯示 -->
+        <div class="bg-slate-950 border-2 border-cyan-500/50 rounded-2xl p-4 text-center my-2 shadow-inner flex flex-col items-center justify-center min-h-[85px]">
+          <div class="text-[10px] text-slate-500 font-mono mb-1 uppercase tracking-widest">TARGET IDENTITY</div>
+          <div id="active-equation-display" class="text-2xl sm:text-3xl font-black text-cyan-300">
+            $7x + 9 \equiv Ax + B$
+          </div>
+        </div>
+
+        <!-- 拆解步驟輔助區 -->
+        <div id="hint-box" class="hidden bg-slate-950/90 border border-amber-500/50 rounded-xl p-3 my-2 text-sm text-slate-200">
+          <div class="text-xs font-bold text-amber-400 mb-1">🔍 拆解展開分析：</div>
+          <div id="hint-content" class="font-mono text-base text-center">
+            <!-- JS 動態填入 -->
+          </div>
+        </div>
+
+        <!-- 雙管雷射功率調節區 -->
+        <div class="my-3 bg-slate-950/80 p-4 rounded-2xl border border-slate-800">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs sm:text-sm font-bold text-slate-300">校準雙管功率：</span>
+            <button onclick="toggleHint()" class="text-xs text-amber-400 hover:text-amber-300 underline font-semibold">
+              💡 顯示展開步驟
+            </button>
+          </div>
+
+          <div id="cannon-inputs" class="grid grid-cols-2 gap-3">
+            <!-- JS 動態生成左砲/右砲輸入框 -->
+          </div>
+        </div>
+
+        <!-- 反饋訊息 -->
+        <div id="feedback-banner" class="hidden p-3 rounded-xl border text-sm font-bold text-center leading-relaxed my-2">
+        </div>
+
+        <!-- 發射鈕 -->
+        <button id="btn-fire" onclick="fireLasers()" class="w-full bg-gradient-to-r from-cyan-400 via-purple-500 to-rose-500 hover:from-cyan-300 hover:to-rose-400 text-slate-950 font-black py-3.5 rounded-2xl shadow-xl text-lg transition transform active:scale-95 flex items-center justify-center gap-2 mt-1 glow-cyan">
+          <span>⚡ 發射雷射砲！</span>
+        </button>
+
+      </div>
+
+      <!-- 大螢幕觸控數字盤 -->
+      <div class="bg-slate-900/90 border-2 border-slate-800 rounded-3xl p-4 shadow-xl">
+        <div class="text-xs font-bold text-slate-400 mb-2 flex items-center justify-between px-1">
+          <span>觸控數字盤 (點選上方輸入框後輸入)</span>
+          <span class="text-[10px] text-slate-500">TOUCH NUMPAD</span>
+        </div>
+        <div class="grid grid-cols-6 gap-2">
+          <button onclick="pressNumpad('1')" class="bg-slate-800 hover:bg-slate-700 active:bg-cyan-600 text-white font-bold py-2.5 rounded-xl text-lg transition">1</button>
+          <button onclick="pressNumpad('2')" class="bg-slate-800 hover:bg-slate-700 active:bg-cyan-600 text-white font-bold py-2.5 rounded-xl text-lg transition">2</button>
+          <button onclick="pressNumpad('3')" class="bg-slate-800 hover:bg-slate-700 active:bg-cyan-600 text-white font-bold py-2.5 rounded-xl text-lg transition">3</button>
+          <button onclick="pressNumpad('4')" class="bg-slate-800 hover:bg-slate-700 active:bg-cyan-600 text-white font-bold py-2.5 rounded-xl text-lg transition">4</button>
+          <button onclick="pressNumpad('5')" class="bg-slate-800 hover:bg-slate-700 active:bg-cyan-600 text-white font-bold py-2.5 rounded-xl text-lg transition">5</button>
+          <button onclick="pressNumpad('-')" class="bg-amber-900/80 hover:bg-amber-700 active:bg-amber-600 text-amber-200 font-bold py-2.5 rounded-xl text-base transition border border-amber-600 shadow"> 負號 - </button>
+
+          <button onclick="pressNumpad('6')" class="bg-slate-800 hover:bg-slate-700 active:bg-cyan-600 text-white font-bold py-2.5 rounded-xl text-lg transition">6</button>
+          <button onclick="pressNumpad('7')" class="bg-slate-800 hover:bg-slate-700 active:bg-cyan-600 text-white font-bold py-2.5 rounded-xl text-lg transition">7</button>
+          <button onclick="pressNumpad('8')" class="bg-slate-800 hover:bg-slate-700 active:bg-cyan-600 text-white font-bold py-2.5 rounded-xl text-lg transition">8</button>
+          <button onclick="pressNumpad('9')" class="bg-slate-800 hover:bg-slate-700 active:bg-cyan-600 text-white font-bold py-2.5 rounded-xl text-lg transition">9</button>
+          <button onclick="pressNumpad('0')" class="bg-slate-800 hover:bg-slate-700 active:bg-cyan-600 text-white font-bold py-2.5 rounded-xl text-lg transition">0</button>
+          <button onclick="backspaceNumpad()" class="bg-rose-950 hover:bg-rose-900 text-rose-300 font-bold py-2.5 rounded-xl text-xs transition border border-rose-800">退格</button>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- 歡迎頁面 / 暱稱輸入 Modal -->
+  <div id="welcome-modal" class="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 z-50">
+    <div class="bg-slate-900 border-2 border-cyan-500/80 p-6 sm:p-8 rounded-3xl max-w-md w-full text-center shadow-2xl glow-cyan">
+      <div class="w-16 h-16 bg-gradient-to-tr from-cyan-500 to-rose-500 rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-lg mb-4">
+        🛸
+      </div>
+      <h2 class="text-2xl sm:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-rose-400 font-orbitron mb-2">
+        恆等式雷射防衛戰
+      </h2>
+      <p class="text-slate-300 text-xs sm:text-sm mb-6 leading-relaxed">
+        請輸入你的指揮官暱稱，調校雙管雷射功率，連續擊退 10 艘逼近的敵方敵艦！
+      </p>
+
+      <div class="mb-6 text-left">
+        <label class="block text-xs font-bold text-cyan-400 mb-2">指揮官暱稱：</label>
+        <input type="text" id="player-nickname-input" placeholder="例如：星際隊長" value="太空戰士"
+          class="w-full p-3.5 bg-slate-950 border-2 border-cyan-500/60 focus:border-cyan-400 text-cyan-200 rounded-xl font-bold text-lg text-center focus:outline-none transition shadow-inner">
+      </div>
+
+      <button onclick="startGameFromWelcome()" class="w-full bg-gradient-to-r from-cyan-400 via-purple-500 to-rose-500 hover:from-cyan-300 hover:to-rose-400 text-slate-950 font-black py-4 rounded-2xl shadow-xl text-lg sm:text-xl transition transform active:scale-95 glow-cyan">
+        🚀 啟動防禦任務
+      </button>
+    </div>
+  </div>
+
+  <!-- GAME OVER / VICTORY 結算視窗 -->
+  <div id="result-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+    <div id="result-card" class="bg-slate-900 border-2 p-6 sm:p-8 rounded-3xl max-w-md w-full text-center shadow-2xl">
+      <div id="result-icon" class="text-5xl mb-3">🏆</div>
+      <h2 id="result-title" class="text-3xl font-black font-orbitron mb-2">任務成功！</h2>
+      <p id="result-subtitle" class="text-slate-300 text-sm mb-4">你成功化解了所有敵艦威脅！</p>
+      
+      <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 mb-6 space-y-2 text-left text-sm font-mono">
+        <div class="flex justify-between">
+          <span class="text-slate-400">指揮官：</span>
+          <span id="res-player-name" class="text-cyan-400 font-bold">太空戰士</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-400">解答題數：</span>
+          <span id="res-completed-count" class="text-purple-400 font-bold">10 / 10</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-400">剩餘防衛能量 (HP)：</span>
+          <span id="res-hp" class="text-emerald-400 font-bold">100 HP</span>
+        </div>
+        <div class="flex justify-between border-t border-slate-800 pt-2 text-base font-bold">
+          <span class="text-slate-300">最終總積分：</span>
+          <span id="res-final-score" class="text-cyan-300 text-xl font-black">0000</span>
+        </div>
+      </div>
+
+      <button onclick="restartGame()" class="w-full bg-gradient-to-r from-cyan-400 to-rose-500 hover:from-cyan-300 hover:to-rose-400 text-slate-950 font-black py-3.5 rounded-2xl shadow-xl text-lg transition transform active:scale-95">
+        🔄 再次發起任務
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // -------------------------------------------------------------
+    // 簡化版 10 題題目庫 (強調直接單一對應與一步展開，適合快速鞏固)
+    // -------------------------------------------------------------
+    const problemPool = [
+      {
+        id: 1,
+        source: '習題 3A (19)',
+        equation: '$7x + 9 \\equiv Ax + B$',
+        expanded: '$7x + 9$',
+        targets: [
+          { name: 'A', label: 'x 係數 (A)', value: 7, color: 'cyan' },
+          { name: 'B', label: '常數項 (B)', value: 9, color: 'rose' }
+        ],
+        hint: '直接對照同類項：$x$ 項係數 $A = 7$，常數項 $B = 9$'
+      },
+      {
+        id: 2,
+        source: '習題 3A (20)',
+        equation: '$4(y + 4) \\equiv Ay + B$',
+        expanded: '$4y + 16$',
+        targets: [
+          { name: 'A', label: 'y 係數 (A)', value: 4, color: 'cyan' },
+          { name: 'B', label: '常數項 (B)', value: 16, color: 'rose' }
+        ],
+        hint: '展開 $4(y + 4) = 4y + 16$，可得 $A = 4$, $B = 16$'
+      },
+      {
+        id: 3,
+        source: '習題 3A (23)',
+        equation: '$2x(x - 9) \\equiv Ax^2 + Bx$',
+        expanded: '$2x^2 - 18x$',
+        targets: [
+          { name: 'A', label: 'x² 係數 (A)', value: 2, color: 'cyan' },
+          { name: 'B', label: 'x 係數 (B)', value: -18, color: 'rose' }
+        ],
+        hint: '展開 $2x(x - 9) = 2x^2 - 18x$，對照得 $A = 2$, $B = -18$'
+      },
+      {
+        id: 4,
+        source: '基礎鞏固 1',
+        equation: '$3(x - 5) \\equiv Ax + B$',
+        expanded: '$3x - 15$',
+        targets: [
+          { name: 'A', label: 'x 係數 (A)', value: 3, color: 'cyan' },
+          { name: 'B', label: '常數項 (B)', value: -15, color: 'rose' }
+        ],
+        hint: '展開 $3(x - 5) = 3x - 15$，對照得 $A = 3$, $B = -15$'
+      },
+      {
+        id: 5,
+        source: '基礎鞏固 2',
+        equation: '$5(2y + 1) \\equiv Ay + B$',
+        expanded: '$10y + 5$',
+        targets: [
+          { name: 'A', label: 'y 係數 (A)', value: 10, color: 'cyan' },
+          { name: 'B', label: '常數項 (B)', value: 5, color: 'rose' }
+        ],
+        hint: '展開 $5(2y + 1) = 10y + 5$，對照得 $A = 10$, $B = 5$'
+      },
+      {
+        id: 6,
+        source: '基礎鞏固 3',
+        equation: '$3x(x + 4) \\equiv Ax^2 + Bx$',
+        expanded: '$3x^2 + 12x$',
+        targets: [
+          { name: 'A', label: 'x² 係數 (A)', value: 3, color: 'cyan' },
+          { name: 'B', label: 'x 係數 (B)', value: 12, color: 'rose' }
+        ],
+        hint: '展開 $3x(x + 4) = 3x^2 + 12x$，對照得 $A = 3$, $B = 12$'
+      },
+      {
+        id: 7,
+        source: '基礎鞏固 4',
+        equation: '$-2(y - 6) \\equiv Ay + B$',
+        expanded: '$-2y + 12$',
+        targets: [
+          { name: 'A', label: 'y 係數 (A)', value: -2, color: 'cyan' },
+          { name: 'B', label: '常數項 (B)', value: 12, color: 'rose' }
+        ],
+        hint: '展開 $-2(y - 6) = -2y + 12$，對照得 $A = -2$, $B = 12$'
+      },
+      {
+        id: 8,
+        source: '基礎鞏固 5',
+        equation: '$4x(2x - 3) \\equiv Ax^2 + Bx$',
+        expanded: '$8x^2 - 12x$',
+        targets: [
+          { name: 'A', label: 'x² 係數 (A)', value: 8, color: 'cyan' },
+          { name: 'B', label: 'x 係數 (B)', value: -12, color: 'rose' }
+        ],
+        hint: '展開 $4x(2x - 3) = 8x^2 - 12x$，對照得 $A = 8$, $B = -12$'
+      },
+      {
+        id: 9,
+        source: '基礎鞏固 6',
+        equation: '$6x - 11 \\equiv Ax + B$',
+        expanded: '$6x - 11$',
+        targets: [
+          { name: 'A', label: 'x 係數 (A)', value: 6, color: 'cyan' },
+          { name: 'B', label: '常數項 (B)', value: -11, color: 'rose' }
+        ],
+        hint: '直接對照同類項：$x$ 項係數 $A = 6$，常數項 $B = -11$'
+      },
+      {
+        id: 10,
+        source: '基礎鞏固 7',
+        equation: '$5y(y - 2) \\equiv Ay^2 + By$',
+        expanded: '$5y^2 - 10y$',
+        targets: [
+          { name: 'A', label: 'y² 係數 (A)', value: 5, color: 'cyan' },
+          { name: 'B', label: 'y 係數 (B)', value: -10, color: 'rose' }
+        ],
+        hint: '展開 $5y(y - 2) = 5y^2 - 10y$，對照得 $A = 5$, $B = -10$'
+      }
+    ];
+
+    // 全域遊戲狀態
+    let playerName = '太空戰士';
+    let currentProbIndex = 0;
+    let questionsCompleted = 0;
+    let score = 0;
+    let hp = 100;
+    const maxHp = 100;
+    let activeFocusedInputId = null;
+    let gameEnded = false;
+
+    // 敵艦狀態
+    let spaceship = {
+      x: 0,
+      y: 60,
+      width: 90,
+      height: 50,
+      speed: 0.28,
+      wingAngle: 0,
+      leftHit: false,
+      rightHit: false,
+      enemyShootTimer: 0
+    };
+
+    // Canvas 繪圖物件
+    let canvas, ctx;
+    let playerLasers = [];
+    let enemyLasers = [];
+    let particles = [];
+    let stars = [];
+    let screenShake = 0;
+
+    window.onload = function() {
+      canvas = document.getElementById('gameCanvas');
+      ctx = canvas.getContext('2d');
+      resizeCanvas();
+
+      // 生成背景星空
+      for (let i = 0; i < 75; i++) {
+        stars.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          radius: Math.random() * 1.8,
+          alpha: Math.random(),
+          speed: Math.random() * 0.5 + 0.2
+        });
+      }
+
+      requestAnimationFrame(gameLoop);
+    };
+
+    function resizeCanvas() {
+      if (!canvas) return;
+      canvas.width = canvas.parentElement.clientWidth;
+      canvas.height = 420;
+    }
+
+    window.onresize = resizeCanvas;
+
+    function startGameFromWelcome() {
+      const input = document.getElementById('player-nickname-input').value.trim();
+      playerName = input !== '' ? input : '太空戰士';
+      document.getElementById('display-player-name').innerText = playerName;
+      document.getElementById('welcome-modal').classList.add('hidden');
+
+      // 重置遊戲參數
+      score = 0;
+      hp = 100;
+      questionsCompleted = 0;
+      currentProbIndex = 0;
+      gameEnded = false;
+
+      updateHpUI();
+      updateScoreUI();
+      updateProgressUI();
+      loadQuestion(0);
+      resetSpaceshipPosition();
+    }
+
+    function resetSpaceshipPosition() {
+      spaceship.x = canvas.width / 2;
+      spaceship.y = 50;
+      spaceship.speed = 0.25 + (questionsCompleted * 0.04);
+      spaceship.leftHit = false;
+      spaceship.rightHit = false;
+      spaceship.enemyShootTimer = 0;
+    }
+
+    function updateHpUI() {
+      if (hp < 0) hp = 0;
+      if (hp > maxHp) hp = maxHp;
+      const fill = document.getElementById('hp-bar-fill');
+      const text = document.getElementById('hp-text');
+      fill.style.width = `${hp}%`;
+      text.innerText = `${hp} / ${maxHp}`;
+
+      // 顏色警戒變換
+      if (hp <= 30) {
+        fill.className = "bg-gradient-to-r from-rose-600 to-rose-500 h-full transition-all duration-300 animate-pulse";
+      } else {
+        fill.className = "bg-gradient-to-r from-rose-500 via-amber-400 to-emerald-400 h-full transition-all duration-300";
+      }
+    }
+
+    function updateScoreUI() {
+      document.getElementById('score-display').innerText = score.toString().padStart(4, '0');
+    }
+
+    function updateProgressUI() {
+      document.getElementById('progress-text').innerText = `${questionsCompleted + 1} / ${problemPool.length}`;
+    }
+
+    // Canvas 遊戲動態循環
+    function gameLoop() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.save();
+      // 畫面震動效果
+      if (screenShake > 0) {
+        let rx = (Math.random() - 0.5) * screenShake;
+        let ry = (Math.random() - 0.5) * screenShake;
+        ctx.translate(rx, ry);
+        screenShake -= 0.6;
+      }
+
+      // 1. 背景動態星空
+      stars.forEach(star => {
+        star.y += star.speed;
+        if (star.y > canvas.height) star.y = 0;
+        ctx.fillStyle = '#ffffff';
+        ctx.globalAlpha = star.alpha;
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.globalAlpha = 1.0;
+
+      // 2. 繪製紅色警戒線
+      const dangerY = canvas.height - 70;
+      ctx.strokeStyle = spaceship.y > dangerY - 60 ? 'rgba(244, 63, 94, 0.9)' : 'rgba(6, 182, 212, 0.35)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8, 8]);
+      ctx.beginPath();
+      ctx.moveTo(0, dangerY);
+      ctx.lineTo(canvas.width, dangerY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // 3. 敵艦逼近與攻擊邏輯
+      if (!gameEnded) {
+        spaceship.y += spaceship.speed;
+        spaceship.wingAngle += 0.05;
+        spaceship.enemyShootTimer++;
+
+        // 敵船發射電漿砲
+        if (spaceship.enemyShootTimer > 200) {
+          spaceship.enemyShootTimer = 0;
+          fireEnemyLaser();
+        }
+
+        // 飛船越過警戒防線
+        if (spaceship.y >= dangerY) {
+          modifyHp(-25, "⚠️ 敵艦越過警戒線！防衛堡壘遭受直接碰撞重創！ (-25 HP)");
+          resetSpaceshipPosition();
+        }
+      }
+
+      // 4. 繪製外星敵艦
+      ctx.save();
+      ctx.translate(spaceship.x, spaceship.y);
+
+      // 噴射尾焰
+      ctx.fillStyle = spaceship.y > dangerY - 60 ? '#f43f5e' : '#38bdf8';
+      ctx.shadowColor = ctx.fillStyle;
+      ctx.shadowBlur = 15;
+      ctx.beginPath();
+      ctx.moveTo(-15, -20);
+      ctx.lineTo(0, -20 - Math.random() * 25);
+      ctx.lineTo(15, -20);
+      ctx.fill();
+
+      // 主艦體
+      ctx.fillStyle = '#1e293b';
+      ctx.strokeStyle = spaceship.y > dangerY - 60 ? '#f43f5e' : '#06b6d4';
+      ctx.lineWidth = 3;
+
+      ctx.beginPath();
+      ctx.moveTo(0, 28);
+      ctx.lineTo(-45, -10 + Math.sin(spaceship.wingAngle) * 3);
+      ctx.lineTo(-20, -15);
+      ctx.lineTo(0, -5);
+      ctx.lineTo(20, -15);
+      ctx.lineTo(45, -10 + Math.sin(spaceship.wingAngle) * 3);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // 機翼部位受損火花
+      if (spaceship.leftHit) {
+        ctx.fillStyle = '#f97316';
+        ctx.beginPath();
+        ctx.arc(-30, 0, Math.random() * 8 + 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      if (spaceship.rightHit) {
+        ctx.fillStyle = '#f97316';
+        ctx.beginPath();
+        ctx.arc(30, 0, Math.random() * 8 + 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 艦頭核心能量燈
+      ctx.fillStyle = spaceship.y > dangerY - 60 ? '#f43f5e' : '#a855f7';
+      ctx.beginPath();
+      ctx.arc(0, 10, 9, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+
+      // 5. 太空站防禦雙砲台
+      const leftCannonX = canvas.width * 0.28;
+      const rightCannonX = canvas.width * 0.72;
+      const cannonY = canvas.height - 18;
+
+      // 左砲 (Cyan)
+      ctx.fillStyle = '#06b6d4';
+      ctx.fillRect(leftCannonX - 18, cannonY - 22, 36, 22);
+      ctx.shadowColor = '#06b6d4';
+      ctx.shadowBlur = 12;
+
+      // 右砲 (Rose)
+      ctx.fillStyle = '#f43f5e';
+      ctx.fillRect(rightCannonX - 18, cannonY - 22, 36, 22);
+      ctx.shadowColor = '#f43f5e';
+      ctx.shadowBlur = 12;
+      ctx.shadowBlur = 0;
+
+      // 6. 玩家發射的超高亮雷射光束 (修正為顯眼光束動畫)
+      for (let index = playerLasers.length - 1; index >= 0; index--) {
+        let laser = playerLasers[index];
+
+        // 推進雷射前端
+        laser.currentX += (laser.targetX - laser.startX) * 0.25;
+        laser.currentY += (laser.targetY - laser.startY) * 0.25;
+
+        // 繪製高亮雷射光束 (從砲台到當前位置)
+        ctx.save();
+        ctx.strokeStyle = laser.color;
+        ctx.lineWidth = 8;
+        ctx.shadowColor = laser.color;
+        ctx.shadowBlur = 25;
+        ctx.beginPath();
+        ctx.moveTo(laser.startX, laser.startY);
+        ctx.lineTo(laser.currentX, laser.currentY);
+        ctx.stroke();
+
+        // 繪製雷射頭光核
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(laser.currentX, laser.currentY, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // 判定擊中目標
+        let dist = Math.hypot(laser.currentX - laser.targetX, laser.currentY - laser.targetY);
+        if (dist < 15) {
+          createExplosion(laser.targetX, laser.targetY, laser.color, 35);
+          screenShake = 12;
+          playerLasers.splice(index, 1);
+        }
+      }
+
+      // 7. 敵船發射的電漿光束
+      for (let index = enemyLasers.length - 1; index >= 0; index--) {
+        let elaser = enemyLasers[index];
+        ctx.fillStyle = '#f59e0b';
+        ctx.shadowColor = '#f59e0b';
+        ctx.shadowBlur = 15;
+        ctx.beginPath();
+        ctx.arc(elaser.x, elaser.y, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        elaser.y += elaser.speed;
+
+        // 擊中底線扣減 HP
+        if (elaser.y >= cannonY - 10) {
+          createExplosion(elaser.x, cannonY, '#f59e0b', 18);
+          screenShake = 8;
+          playErrorSound();
+          modifyHp(-10, "⚠️ 遭敵艦電漿光束直接命中防護罩！ (-10 HP)");
+          enemyLasers.splice(index, 1);
+        }
+      }
+
+      // 8. 粒子爆破動畫
+      for (let index = particles.length - 1; index >= 0; index--) {
+        let p = particles[index];
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = p.alpha;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        p.x += p.vx;
+        p.y += p.vy;
+        p.alpha -= 0.03;
+
+        if (p.alpha <= 0) particles.splice(index, 1);
+      }
+      ctx.globalAlpha = 1.0;
+
+      ctx.restore();
+      requestAnimationFrame(gameLoop);
+    }
+
+    // 敵艦發射電漿砲
+    function fireEnemyLaser() {
+      const alertTag = document.getElementById('enemy-alert-tag');
+      if (alertTag) {
+        alertTag.classList.remove('hidden');
+        setTimeout(() => alertTag.classList.add('hidden'), 1200);
+      }
+      enemyLasers.push({
+        x: spaceship.x + (Math.random() - 0.5) * 40,
+        y: spaceship.y + 20,
+        speed: 4.5 + Math.random() * 2
+      });
+      playPlasmaSound();
+    }
+
+    function createExplosion(x, y, color, count = 25) {
+      for (let i = 0; i < count; i++) {
+        particles.push({
+          x: x,
+          y: y,
+          vx: (Math.random() - 0.5) * 14,
+          vy: (Math.random() - 0.5) * 14,
+          radius: Math.random() * 5 + 2,
+          color: color,
+          alpha: 1.0
+        });
+      }
+    }
+
+    // 載入題目
+    function loadQuestion(index) {
+      currentProbIndex = index;
+      const prob = problemPool[index];
+
+      document.getElementById('problem-source').innerText = prob.source;
+      document.getElementById('active-equation-display').innerHTML = prob.equation;
+
+      // 重置提示與反饋區
+      document.getElementById('hint-box').classList.add('hidden');
+      document.getElementById('feedback-banner').className = 'hidden';
+
+      // 動態生成雙砲台輸入框
+      const container = document.getElementById('cannon-inputs');
+      container.innerHTML = '';
+
+      prob.targets.forEach((target, idx) => {
+        const fieldId = `input-cannon-${target.name}`;
+        const div = document.createElement('div');
+        div.className = "flex flex-col gap-1";
+        
+        const borderColor = target.color === 'cyan' ? 'border-cyan-500/60 focus:border-cyan-400' : 'border-rose-500/60 focus:border-rose-400';
+        const textColor = target.color === 'cyan' ? 'text-cyan-300' : 'text-rose-300';
+
+        div.innerHTML = `
+          <label class="text-xs font-bold ${textColor}">${target.label}:</label>
+          <input type="text" id="${fieldId}" onfocus="setFocusedInput('${fieldId}')"
+            inputmode="numeric" autocomplete="off"
+            class="w-full p-3 bg-slate-900 border-2 ${borderColor} ${textColor} rounded-xl text-center font-black text-2xl focus:outline-none transition shadow-inner"
+            placeholder="?">
+        `;
+        container.appendChild(div);
+
+        if (idx === 0) setFocusedInput(fieldId);
+      });
+
+      if (window.MathJax && window.MathJax.typesetPromise) {
+        window.MathJax.typesetPromise();
+      }
+    }
+
+    function toggleHint() {
+      const prob = problemPool[currentProbIndex];
+      const box = document.getElementById('hint-box');
+      const content = document.getElementById('hint-content');
+
+      if (box.classList.contains('hidden')) {
+        box.classList.remove('hidden');
+        content.innerHTML = `展開左式：<span class="text-cyan-400 font-bold">${prob.expanded}</span><br><span class="text-xs text-slate-400">(${prob.hint})</span>`;
+        if (window.MathJax && window.MathJax.typesetPromise) {
+          window.MathJax.typesetPromise();
+        }
+      } else {
+        box.classList.add('hidden');
+      }
+    }
+
+    function setFocusedInput(id) {
+      activeFocusedInputId = id;
+    }
+
+    // 修復負號 ('-') 按鈕與數字鍵盤操作
+    function pressNumpad(val) {
+      if (!activeFocusedInputId) return;
+      const el = document.getElementById(activeFocusedInputId);
+      if (!el) return;
+
+      let curVal = el.value.trim();
+
+      if (val === '-') {
+        if (curVal.startsWith('-')) {
+          el.value = curVal.substring(1);
+        } else {
+          el.value = '-' + curVal;
+        }
+      } else {
+        el.value = curVal + val;
+      }
+    }
+
+    function backspaceNumpad() {
+      if (!activeFocusedInputId) return;
+      const el = document.getElementById(activeFocusedInputId);
+      if (el && el.value.length > 0) {
+        el.value = el.value.slice(0, -1);
+      }
+    }
+
+    // 發射雙管雷射與答題驗證
+    function fireLasers() {
+      if (gameEnded) return;
+
+      const prob = problemPool[currentProbIndex];
+      const banner = document.getElementById('feedback-banner');
+      
+      let cannonResults = [];
+
+      prob.targets.forEach(target => {
+        const el = document.getElementById(`input-cannon-${target.name}`);
+        const rawVal = el ? el.value.trim() : '';
+        const userVal = parseFloat(rawVal);
+        const isCorrect = !isNaN(userVal) && userVal === target.value;
+
+        cannonResults.push({
+          name: target.name,
+          label: target.label,
+          isCorrect: isCorrect,
+          userVal: userVal,
+          targetVal: target.value,
+          color: target.color === 'cyan' ? '#06b6d4' : '#f43f5e'
+        });
+      });
+
+      const correctCount = cannonResults.filter(r => r.isCorrect).length;
+      banner.classList.remove('hidden');
+
+      const canvasWidth = canvas.width;
+      const canvasHeight = canvas.height;
+
+      if (correctCount === 2) {
+        // 1. 完全答對 (2/2)：雙雷射齊發，摧毀敵船
+        banner.className = "p-3 rounded-xl border border-emerald-500 bg-emerald-950/90 text-emerald-300 font-bold text-center text-base my-2 shadow-lg";
+        banner.innerHTML = "🎯 <b>雙管功率完全鎖定！雙管高亮雷射齊發！</b><br>敵艦已徹底毀滅！防衛能量回充 (+15 HP)";
+
+        // 發射雙管高亮雷射
+        playerLasers.push({ startX: canvasWidth * 0.28, startY: canvasHeight - 18, currentX: canvasWidth * 0.28, currentY: canvasHeight - 18, targetX: spaceship.x - 15, targetY: spaceship.y, color: '#06b6d4' });
+        playerLasers.push({ startX: canvasWidth * 0.72, startY: canvasHeight - 18, currentX: canvasWidth * 0.72, currentY: canvasHeight - 18, targetX: spaceship.x + 15, targetY: spaceship.y, color: '#f43f5e' });
+
+        playLaserSound();
+        confetti({ particleCount: 65, spread: 70, origin: { y: 0.6 } });
+
+        score += 300;
+        modifyHp(15);
+        updateScoreUI();
+
+        questionsCompleted++;
+        updateProgressUI();
+
+        // 檢查是否通關全部 10 題
+        if (questionsCompleted >= problemPool.length) {
+          setTimeout(() => endGame(true), 1200);
+        } else {
+          setTimeout(() => {
+            currentProbIndex = questionsCompleted;
+            loadQuestion(currentProbIndex);
+            resetSpaceshipPosition();
+          }, 1200);
+        }
+
+      } else if (correctCount === 1) {
+        // 2. 部分答對 (1/2)：發射單光束，微扣 HP (-10 HP)
+        const correctTarget = cannonResults.find(r => r.isCorrect);
+        const wrongTarget = cannonResults.find(r => !r.isCorrect);
+
+        banner.className = "p-3 rounded-xl border border-amber-500 bg-amber-950/90 text-amber-300 font-bold text-center text-base my-2 shadow-lg";
+        banner.innerHTML = `⚡ <b>部分命中！</b> ${correctTarget.label} 校準正確！已造成局部打擊！<br>⚠️ 但 ${wrongTarget.label} 功率偏差，發動機過載扣減防禦能量 (-10 HP)！`;
+
+        if (correctTarget.name === prob.targets[0].name) {
+          playerLasers.push({ startX: canvasWidth * 0.28, startY: canvasHeight - 18, currentX: canvasWidth * 0.28, currentY: canvasHeight - 18, targetX: spaceship.x - 25, targetY: spaceship.y, color: correctTarget.color });
+          spaceship.leftHit = true;
+        } else {
+          playerLasers.push({ startX: canvasWidth * 0.72, startY: canvasHeight - 18, currentX: canvasWidth * 0.72, currentY: canvasHeight - 18, targetX: spaceship.x + 25, targetY: spaceship.y, color: correctTarget.color });
+          spaceship.rightHit = true;
+        }
+
+        playLaserSound();
+        score += 80;
+        updateScoreUI();
+        modifyHp(-10);
+
+      } else {
+        // 3. 完全答錯 (0/2)：扣分數與 HP (-20 HP)
+        banner.className = "p-3 rounded-xl border border-rose-500 bg-rose-950/90 text-rose-300 font-bold text-center text-base my-2 shadow-lg";
+        banner.innerHTML = "🤔 <b>雙管功率皆有嚴重偏差！</b> 雷射卡彈！遭敵艦電漿突襲 (-20 HP)！";
+        
+        playErrorSound();
+        if (score >= 50) score -= 50;
+        updateScoreUI();
+        modifyHp(-20);
+        fireEnemyLaser();
+      }
+    }
+
+    function modifyHp(amount, reason = null) {
+      if (gameEnded) return;
+      hp += amount;
+      updateHpUI();
+
+      if (hp <= 0) {
+        endGame(false);
+      } else if (reason && amount < 0) {
+        // 可選提醒
+      }
+    }
+
+    function endGame(isVictory) {
+      gameEnded = true;
+      const modal = document.getElementById('result-modal');
+      const card = document.getElementById('result-card');
+      const icon = document.getElementById('result-icon');
+      const title = document.getElementById('result-title');
+      const subtitle = document.getElementById('result-subtitle');
+
+      document.getElementById('res-player-name').innerText = playerName;
+      document.getElementById('res-completed-count').innerText = `${questionsCompleted} / ${problemPool.length}`;
+      document.getElementById('res-hp').innerText = `${hp} HP`;
+      document.getElementById('res-final-score').innerText = score.toString().padStart(4, '0');
+
+      if (isVictory) {
+        card.className = "bg-slate-900 border-2 border-emerald-500 p-6 sm:p-8 rounded-3xl max-w-md w-full text-center shadow-2xl glow-cyan";
+        icon.innerText = "🏆";
+        title.className = "text-3xl font-black text-emerald-400 font-orbitron mb-2";
+        title.innerText = "任務完美勝利！";
+        subtitle.innerText = "成功擊毀所有敵艦，守護了恆等式基地！";
+        confetti({ particleCount: 120, spread: 90, origin: { y: 0.5 } });
+      } else {
+        card.className = "bg-slate-900 border-2 border-rose-500 p-6 sm:p-8 rounded-3xl max-w-md w-full text-center shadow-2xl glow-rose";
+        icon.innerText = "💥";
+        title.className = "text-3xl font-black text-rose-400 font-orbitron mb-2";
+        title.innerText = "防衛陣線失守！";
+        subtitle.innerText = "基地防護罩生命值歸零，請重新發起防禦！";
+      }
+
+      modal.classList.remove('hidden');
+    }
+
+    function restartGame() {
+      document.getElementById('result-modal').classList.add('hidden');
+      document.getElementById('welcome-modal').classList.remove('hidden');
+    }
+
+    function playLaserSound() {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(850, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.35);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.35);
+      } catch (e) {}
+    }
+
+    function playPlasmaSound() {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + 0.25);
+        gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.25);
+      } catch (e) {}
+    }
+
+    function playErrorSound() {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(130, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.25);
+      } catch (e) {}
+    }
+  </script>
+</body>
+</html>
